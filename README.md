@@ -1,4 +1,4 @@
-# ✨Betaflight Assistant✨
+# ✨BetaflightAssistant✨
 
 > 让穿越机调参像聊天一样简单
 
