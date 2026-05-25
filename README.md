@@ -4,6 +4,7 @@
 # ✨BetaflightAssistant✨
 
 > 让穿越机调参像聊天一样简单
+> 🚨 **安全警告**：AI 建议仅供参考，调参后务必低空悬停测试，确认安全再飞。放生风险自负。
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-0078d4.svg)](https://github.com/orange508/BetaflightAssistant/releases)
