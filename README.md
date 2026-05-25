@@ -1,7 +1,7 @@
 ![Betaflight](https://raw.githubusercontent.com/betaflight/.github/main/profile/images/bf_logo.svg#gh-light-mode-only)
 ![Betaflight](https://raw.githubusercontent.com/betaflight/.github/main/profile/images/bf_logo_dark.svg#gh-dark-mode-only)
 
-# ✨Betaflight Assistant✨
+# ✨BetaflightAssistant✨
 
 > 让穿越机调参像聊天一样简单
 
