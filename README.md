@@ -1,7 +1,7 @@
 ![Betaflight](https://raw.githubusercontent.com/betaflight/.github/main/profile/images/bf_logo.svg#gh-light-mode-only)
 ![Betaflight](https://raw.githubusercontent.com/betaflight/.github/main/profile/images/bf_logo_dark.svg#gh-dark-mode-only)
 
-# Betaflight Assistant
+# ✨Betaflight Assistant✨
 
 > 让穿越机调参像聊天一样简单
 
@@ -12,7 +12,7 @@
 
 ---
 
-## 🎯 这是什么？
+## 这是什么？
 
 **Betaflight Assistant** 是一个 AI 侧边栏工具，嵌入在 Betaflight Configurator 中。
 
@@ -30,9 +30,9 @@ AI 会：
 
 ---
 
-## ⚠️ 重要提醒
+## 重要提醒
 
-> 🤖 **AI 不是人类，不会飞，也不懂你的手感。**
+> **AI 不是人类，不会飞，也不懂你的手感。**
 > 
 > AI 给出的建议基于数据分析，但每个人的飞行风格、手感偏好、飞机状态都不一样。
 > 
@@ -49,12 +49,11 @@ AI 会：
 
 | 功能 | 说明 |
 |------|------|
-| 🤖 自动读参 | 飞控一连接，AI 自动读取全部参数 |
-| 🧠 智能分析 | 基于当前配置给出优化建议 |
-| ⚡ 一键执行 | CLI 命令自动发送，不用复制粘贴 |
-| 🔄 参数纠正 | 自动适配 Betaflight 4.5+ 参数名 |
-| 📊 实时状态 | PID、滤波器、电机数据实时显示 |
-| ↩️ 一键回滚 | 不满意可以恢复到调参前状态 |
+| 自动读参 | 飞控一连接，AI 自动读取全部参数 |
+| 智能分析 | 基于当前配置给出优化建议 |
+| 一键执行 | CLI 命令自动发送，不用复制粘贴 |
+| 参数纠正 | 自动适配 Betaflight 4.5+ 参数名 |
+| 实时状态 | PID、滤波器、电机数据实时显示 |
 
 ---
 
@@ -62,16 +61,16 @@ AI 会：
 
 | 服务商 | 说明 |
 |--------|------|
-| 🔵 DeepSeek | 推荐，便宜，响应快 |
-| 🟢 OpenAI | GPT-4 / GPT-3.5 |
-| 🟠 火山引擎 | 豆包大模型 |
-| 🟣 Ollama | 本地任意开源模型，免费 |
+| DeepSeek | 推荐，便宜，响应快 |
+| OpenAI | GPT-4 / GPT-3.5 |
+| 火山引擎 | 豆包大模型 |
+| Ollama | 本地任意开源模型，免费 |
 
 > 只要支持 OpenAI 格式 API，都能直接用。
 
 ---
 
-## 🎬 实测效果
+## 实测效果
 
 **机型**：百达75Pro 04版  
 **电池**：1S 680mAh  
@@ -132,7 +131,7 @@ AI 会：
 
 ---
 
-## 📄 开源协议
+## ✨开源协议
 
 MIT © orange508
 
