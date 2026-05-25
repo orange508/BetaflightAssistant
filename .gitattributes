@@ -1,0 +1,42 @@
+#
+# https://help.github.com/articles/dealing-with-line-endings/
+#
+# Linux start script should use lf
+/gradlew        text eol=lf
+
+# These are Windows script files and should use crlf
+*.bat           text eol=crlf
+
+# Binary files should be left untouched
+*.jar           binary
+
+LICENSE text eol=lf
+*.md text eol=lf
+*.c text eol=lf
+*.cc text eol=lf
+*.h text eol=lf
+*.cc text eol=lf
+*.S text eol=lf
+*.s text eol=lf
+*.hex -crlf -diff
+*.elf -crlf -diff
+*.ld text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+*.nomk text eol=lf
+*.pl text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.svg text eol=lf
+*.png -crlf -diff
+*.yml text eol=lf
+*.xml text eol=lf
+*.mcm text eol=lf
+*.nsi text eol=lf
+*.nsh text eol=lf
+*.lua text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+*.config text eol=lf

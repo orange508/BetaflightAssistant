@@ -1,0 +1,60 @@
+<template>
+    <div v-if="dialogStore.activeDialog">
+        <component
+            ref="currentDialogRef"
+            :is="dialogComponents[dialogStore.activeDialog.type]"
+            v-bind="dialogStore.activeDialog.props"
+            v-on="dialogStore.activeDialog.listeners"
+        />
+    </div>
+</template>
+
+<script setup>
+import { useDialogStore } from "@/stores/dialog";
+import { ref, watch, nextTick } from "vue";
+import YesNoDialog from "./YesNoDialog.vue";
+import InformationDialog from "./InformationDialog.vue";
+import WaitDialog from "./WaitDialog.vue";
+import RebootDialog from "./RebootDialog.vue";
+import EscDshotDirectionDialog from "./EscDshotDirectionDialog.vue";
+import MotorOutputReorderingDialog from "./MotorOutputReorderingDialog.vue";
+import ProfileSelectionDialog from "./ProfileSelectionDialog.vue";
+import RatesTypeDialog from "./RatesTypeDialog.vue";
+import CopyProfileDialog from "./CopyProfileDialog.vue";
+import ReportProblemsDialog from "./ReportProblemsDialog.vue";
+import InteractiveDialog from "./InteractiveDialog.vue";
+
+const dialogStore = useDialogStore();
+const currentDialogRef = ref(null);
+
+const dialogComponents = {
+    YesNoDialog,
+    InformationDialog,
+    WaitDialog,
+    RebootDialog,
+    EscDshotDirectionDialog,
+    MotorOutputReorderingDialog,
+    ProfileSelectionDialog,
+    RatesTypeDialog,
+    CopyProfileDialog,
+    ReportProblemsDialog,
+    InteractiveDialog,
+};
+
+watch(
+    () => dialogStore.activeDialog,
+    async (newVal) => {
+        if (newVal) {
+            await nextTick();
+            // Call show() if the component exposes it (for native dialogs)
+            if (currentDialogRef.value?.show) {
+                currentDialogRef.value.show();
+            } else if (currentDialogRef.value?.dialog?.showModal) {
+                // Fallback if the component exposes the raw dialog element but not a show method
+                currentDialogRef.value.dialog.showModal();
+            }
+        }
+    },
+    { immediate: true },
+);
+</script>

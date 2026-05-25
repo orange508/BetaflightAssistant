@@ -1,0 +1,1289 @@
+<template>
+    <BaseTab tab-name="onboard_logging">
+        <div
+            class="tab-onboard_logging"
+            :class="{
+                'serial-supported': true,
+                'dataflash-supported': dataflashSupported,
+                'dataflash-present': dataflashPresent,
+                'sdcard-supported': sdcardSupported,
+                'blackbox-config-supported': blackboxConfigSupported,
+                'blackbox-supported': blackboxSupport === 'yes',
+                'blackbox-unsupported': blackboxSupport === 'no',
+                'msc-supported': mscSupported,
+                'msc-not-ready': !mscReady,
+                'sdcard-error': sdcardState === MSP.SDCARD_STATE_FATAL,
+                'sdcard-initializing':
+                    sdcardState === MSP.SDCARD_STATE_CARD_INIT || sdcardState === MSP.SDCARD_STATE_FS_INIT,
+                'sdcard-ready': sdcardState === MSP.SDCARD_STATE_READY,
+            }"
+        >
+            <div class="content_wrapper">
+                <div class="tab_title">{{ $t("tabOnboardLogging") }}</div>
+                <WikiButton docUrl="logging" />
+
+                <div class="require-blackbox-unsupported note">
+                    <p>{{ $t("blackboxNotSupported") }}</p>
+                </div>
+
+                <div class="grid-box col1">
+                    <div class="require-blackbox-supported grid-box col1">
+                        <UiBox :title="$t('blackboxConfiguration')" v-show="blackboxConfigSupported">
+                            <SettingRow :label="$t('onboardLoggingBlackbox')">
+                                <USelect
+                                    v-model="blackboxDevice"
+                                    :items="blackboxDeviceOptions"
+                                    size="sm"
+                                    class="min-w-40"
+                                />
+                            </SettingRow>
+                            <SettingRow v-show="blackboxDevice !== 0" :label="$t('onboardLoggingRateOfLogging')">
+                                <USelect v-model="blackboxRate" :items="loggingRates" size="sm" class="min-w-40" />
+                            </SettingRow>
+                            <SettingRow :label="$t('onboardLoggingDebugMode')">
+                                <USelectMenu
+                                    v-model="debugMode"
+                                    value-key="value"
+                                    :items="debugModes"
+                                    size="sm"
+                                    leading-icon="i-lucide-bug"
+                                    :search-input="{
+                                        placeholder: $t('search'),
+                                        icon: 'i-lucide-search',
+                                    }"
+                                    class="min-w-64"
+                                    :ui="{ content: 'max-h-72' }"
+                                />
+                            </SettingRow>
+                        </UiBox>
+
+                        <UiBox
+                            v-if="showDebugFields"
+                            :title="$t('onboardLoggingDebugFields')"
+                            v-show="blackboxConfigSupported"
+                        >
+                            <div class="blackboxDebugFieldsTable">
+                                <div v-for="(field, index) in debugFields" :key="index" class="debug-field-row">
+                                    <USwitch
+                                        :model-value="debugFieldsEnabled[index]"
+                                        size="sm"
+                                        @update:model-value="updateDebugField(index, $event)"
+                                    />
+                                    <span>{{ field }}</span>
+                                </div>
+                            </div>
+                        </UiBox>
+
+                        <UiBox :title="$t('onboardLoggingSerialLogger')">
+                            <p>{{ $t("serialLoggingSupportedNote") }}</p>
+                        </UiBox>
+
+                        <UiBox :title="$t('onboardLoggingFlashLogger')">
+                            <div class="require-dataflash-supported">
+                                <p>{{ $t("dataflashNote") }}</p>
+
+                                <dialog
+                                    ref="eraseDialog"
+                                    class="dataflash-confirm-erase"
+                                    :class="{ erasing: isErasing }"
+                                >
+                                    <h3>{{ $t("dataflashConfirmEraseTitle") }}</h3>
+                                    <div class="dataflash-confirm-erase-note">
+                                        {{ $t("dataflashConfirmEraseNote") }}
+                                    </div>
+                                    <div class="dataflash-erase-progress">
+                                        <div class="data-loading">
+                                            <p>{{ $t("onboardLoggingEraseInProgress") }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="buttons">
+                                        <a
+                                            href="#"
+                                            class="erase-flash-confirm regular-button"
+                                            @click.prevent="flashErase"
+                                        >
+                                            {{ $t("dataflashButtonEraseConfirm") }}
+                                        </a>
+                                        <a
+                                            href="#"
+                                            class="erase-flash-cancel regular-button"
+                                            @click.prevent="flashEraseCancel"
+                                        >
+                                            {{ $t("dataflashButtonEraseCancel") }}
+                                        </a>
+                                    </div>
+                                </dialog>
+
+                                <dialog ref="savingDialog" class="dataflash-saving">
+                                    <h3>{{ $t("dataflashSavingTitle") }}</h3>
+                                    <div class="dataflash-saving-before">
+                                        <div>{{ $t("dataflashSavingNote") }}</div>
+                                        <progress :value="saveProgress" min="0" max="100"></progress>
+                                        <div class="buttons">
+                                            <a
+                                                href="#"
+                                                class="save-flash-cancel regular-button"
+                                                @click.prevent="flashSaveCancel"
+                                            >
+                                                {{ $t("dataflashButtonSaveCancel") }}
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="dataflash-saving-after">
+                                        <div>{{ $t("dataflashSavingNoteAfter") }}</div>
+                                        <div class="buttons">
+                                            <a
+                                                href="#"
+                                                class="save-flash-dismiss regular-button"
+                                                @click.prevent="dismissSavingDialog"
+                                            >
+                                                {{ $t("dataflashButtonSaveDismiss") }}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </dialog>
+
+                                <ul class="dataflash-contents">
+                                    <li
+                                        class="dataflash-used"
+                                        :style="{
+                                            width: dataflashUsedPercent + '%',
+                                            display: dataflashUsedSize > 0 ? 'block' : 'none',
+                                        }"
+                                    >
+                                        <div>{{ $t("dataflashUsedSpace") }} {{ formatBytes(dataflashUsedSize) }}</div>
+                                    </li>
+                                    <li
+                                        class="dataflash-free"
+                                        :style="{
+                                            width: dataflashFreePercent + '%',
+                                            display: dataflashFreeSize > 0 ? 'block' : 'none',
+                                        }"
+                                    >
+                                        <div>{{ $t("dataflashFreeSpace") }} {{ formatBytes(dataflashFreeSize) }}</div>
+                                    </li>
+                                </ul>
+
+                                <div class="dataflash-buttons">
+                                    <a
+                                        class="regular-button erase-flash"
+                                        :class="{ disabled: dataflashUsedSize === 0 }"
+                                        href="#"
+                                        @click.prevent="askToEraseFlash"
+                                    >
+                                        {{ $t("dataflashButtonErase") }}
+                                    </a>
+                                    <a
+                                        class="regular-button require-msc-not-supported save-flash-erase"
+                                        :class="{ disabled: dataflashUsedSize === 0 }"
+                                        href="#"
+                                        @click.prevent="flashSaveBegin(true)"
+                                    >
+                                        {{ $t("dataflashButtonSaveAndErase") }}
+                                    </a>
+                                    <a
+                                        class="regular-button require-msc-not-supported save-flash"
+                                        :class="{ disabled: dataflashUsedSize === 0 }"
+                                        href="#"
+                                        @click.prevent="flashSaveBegin(false)"
+                                    >
+                                        {{ $t("dataflashButtonSaveFile") }}
+                                    </a>
+                                    <a
+                                        v-if="isExpertMode"
+                                        class="regular-button require-msc-supported save-flash-erase"
+                                        :class="{ disabled: dataflashUsedSize === 0 }"
+                                        href="#"
+                                        @click.prevent="flashSaveBegin(true)"
+                                    >
+                                        {{ $t("dataflashButtonSaveAndErase") }}
+                                    </a>
+                                    <a
+                                        class="regular-button require-msc-supported save-flash"
+                                        :class="{ disabled: dataflashUsedSize === 0 }"
+                                        href="#"
+                                        @click.prevent="flashSaveBegin(false)"
+                                    >
+                                        <span>{{ $t("dataflashButtonSaveFile") }}</span>
+                                        <HelpIcon :text="$t('dataflashSaveFileDepreciationHint')" />
+                                    </a>
+                                    <p v-html="$t('dataflashSavetoFileNote')"></p>
+                                </div>
+                            </div>
+
+                            <p class="require-dataflash-not-present">{{ $t("dataflashNotPresentNote") }}</p>
+                        </UiBox>
+
+                        <UiBox :title="$t('onboardLoggingOnboardSDCard')" class="require-sdcard-supported">
+                            <div class="sdcard">
+                                <div class="sdcard-icon"></div>
+                                <div class="sdcard-status" v-html="sdcardStatusText"></div>
+                            </div>
+                            <p>{{ $t("sdcardNote") }}</p>
+
+                            <div class="require-sdcard-ready">
+                                <ul class="sdcard-contents">
+                                    <li
+                                        class="sdcard-other"
+                                        :style="{
+                                            width: sdcardUsedPercent + '%',
+                                            display: sdcardUsedKB > 0 ? 'block' : 'none',
+                                        }"
+                                    >
+                                        <div>{{ $t("dataflashUnavSpace") }} {{ formatKilobytes(sdcardUsedKB) }}</div>
+                                    </li>
+                                    <li
+                                        class="sdcard-free"
+                                        :style="{
+                                            width: sdcardFreePercent + '%',
+                                            display: sdcardFreeKB > 0 ? 'block' : 'none',
+                                        }"
+                                    >
+                                        <div>{{ $t("dataflashLogsSpace") }} {{ formatKilobytes(sdcardFreeKB) }}</div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </UiBox>
+                    </div>
+
+                    <UiBox :title="$t('onboardLoggingMsc')" class="require-msc-supported">
+                        <div class="require-msc-supported">
+                            <div>
+                                <a
+                                    class="require-msc-ready regular-button onboardLoggingRebootMsc"
+                                    :class="{ disabled: !mscReady }"
+                                    href="#"
+                                    @click.prevent="rebootToMsc"
+                                >
+                                    {{ $t("onboardLoggingRebootMscText") }}
+                                </a>
+                            </div>
+                        </div>
+                        <p v-html="$t('onboardLoggingMscNote')"></p>
+                        <p class="require-msc-not-ready">{{ $t("onboardLoggingMscNotReady") }}</p>
+                    </UiBox>
+                </div>
+                <div class="clear-both"></div>
+            </div>
+        </div>
+
+        <div class="content_toolbar toolbar_fixed_bottom">
+            <UButton :label="$t('blackboxButtonSave')" :disabled="!dirty" @click="saveSettings" />
+        </div>
+    </BaseTab>
+</template>
+
+<script>
+import { defineComponent, ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { useFlightControllerStore } from "@/stores/fc";
+import { useConnectionStore } from "@/stores/connection";
+import BaseTab from "./BaseTab.vue";
+import WikiButton from "../elements/WikiButton.vue";
+import UiBox from "../elements/UiBox.vue";
+import SettingRow from "../elements/SettingRow.vue";
+import HelpIcon from "../elements/HelpIcon.vue";
+import GUI from "../../js/gui";
+import MSP from "../../js/msp";
+import MSPCodes from "../../js/msp/MSPCodes";
+import { mspHelper } from "../../js/msp/MSPHelper";
+import { API_VERSION_1_45, API_VERSION_1_47 } from "../../js/data_storage";
+import { i18n } from "../../js/localization";
+import semver from "semver";
+import { gui_log } from "../../js/gui_log";
+import { generateFilename } from "../../js/utils/generate_filename";
+import { useDebugStore } from "../../stores/debug";
+import FileSystem from "../../js/FileSystem";
+import { isExpertModeEnabled } from "../../js/utils/isExpertModeEnabled";
+import NotificationManager from "../../js/utils/notifications";
+import { get as getConfig } from "../../js/ConfigStorage";
+import { sensorTypes } from "../../js/sensor_types";
+
+const BLOCK_SIZE = 4096;
+
+// Helper function for GCD calculation
+function gcd(a, b) {
+    // Convert to integers and get absolute values
+    a = Math.abs(Math.floor(a));
+    b = Math.abs(Math.floor(b));
+
+    // Handle edge cases
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+        return 1;
+    }
+    if (a === 0) {
+        return b || 1;
+    }
+    if (b === 0) {
+        return a || 1;
+    }
+
+    // Euclidean algorithm
+    return gcd(b, a % b);
+}
+
+function formatKilobytes(kilobytes) {
+    if (kilobytes < 1024) {
+        return `${Math.round(kilobytes)}kB`;
+    }
+    const megabytes = kilobytes / 1024;
+    if (megabytes < 900) {
+        return `${megabytes.toFixed(1)}MB`;
+    }
+    const gigabytes = megabytes / 1024;
+    return `${gigabytes.toFixed(1)}GB`;
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) {
+        return `${bytes}B`;
+    }
+    return formatKilobytes(bytes / 1024);
+}
+
+export default defineComponent({
+    name: "OnboardLoggingTab",
+    components: {
+        BaseTab,
+        WikiButton,
+        UiBox,
+        SettingRow,
+        HelpIcon,
+    },
+    setup() {
+        const fcStore = useFlightControllerStore();
+        const connectionStore = useConnectionStore();
+        const debugStore = useDebugStore();
+
+        // Refs
+        const eraseDialog = ref(null);
+        const savingDialog = ref(null);
+
+        // State
+        const blackboxDevice = ref(0);
+        const blackboxRate = ref(0);
+        const debugMode = ref(0);
+        // Initialize all debug fields as enabled by default (empty array causes issues)
+        const debugFieldsEnabled = ref(debugStore.enableFields ? debugStore.enableFields.map(() => true) : []);
+        const saveProgress = ref(0);
+        const saveCancelled = ref(false);
+        const eraseCancelled = ref(false);
+        const isErasing = ref(false);
+        const blockSize = ref(BLOCK_SIZE);
+        const writeError = ref(false);
+
+        let sdcardTimer = null;
+
+        // Computed
+        const dataflashSupported = computed(() => fcStore.dataflash?.supported);
+        const dataflashPresent = computed(() => (fcStore.dataflash?.totalSize || 0) > 0);
+        const sdcardSupported = computed(() => fcStore.sdcard?.supported);
+        const blackboxConfigSupported = computed(() => fcStore.blackbox?.supported);
+        const isExpertMode = computed(() => isExpertModeEnabled());
+
+        const virtualGyro = ref(false);
+
+        const updateVirtualGyro = async () => {
+            if (!fcStore.config?.apiVersion || semver.lt(fcStore.config.apiVersion, API_VERSION_1_47)) {
+                virtualGyro.value = false;
+                return;
+            }
+            const types = await sensorTypes();
+            const index = types.gyro.elements.indexOf("VIRTUAL");
+            virtualGyro.value = fcStore.sensorConfigActive?.gyro_hardware === index;
+        };
+
+        const blackboxDeviceOptions = computed(() => {
+            const options = [{ label: i18n.getMessage("blackboxLoggingNone"), value: 0 }];
+            if (dataflashSupported.value) {
+                options.push({ label: i18n.getMessage("blackboxLoggingFlash"), value: 1 });
+            }
+            if (sdcardSupported.value) {
+                options.push({ label: i18n.getMessage("blackboxLoggingSdCard"), value: 2 });
+            }
+            options.push({ label: i18n.getMessage("blackboxLoggingSerial"), value: 3 });
+            if (virtualGyro.value) {
+                options.push({ label: i18n.getMessage("blackboxLoggingVirtual"), value: 4 });
+            }
+            return options;
+        });
+
+        const blackboxSupport = computed(() => {
+            if (
+                fcStore.blackbox?.supported ||
+                fcStore.dataflash?.supported ||
+                fcStore.features?.features?.isEnabled("BLACKBOX")
+            ) {
+                return "yes";
+            }
+            return "no";
+        });
+
+        const loggingRates = computed(() => {
+            const rates = [];
+
+            // Validate data is available before processing
+            if (!fcStore.config?.sampleRateHz || !fcStore.pidAdvancedConfig?.pid_process_denom) {
+                return rates;
+            }
+
+            const pidRate = fcStore.config.sampleRateHz / fcStore.pidAdvancedConfig.pid_process_denom;
+            const sampleRateNum = 5;
+
+            for (let i = 0; i < sampleRateNum; i++) {
+                let loggingFrequency = Math.round(pidRate / Math.pow(2, i));
+                let loggingFrequencyUnit = "Hz";
+                if (gcd(loggingFrequency, 1000) === 1000) {
+                    loggingFrequency /= 1000;
+                    loggingFrequencyUnit = "kHz";
+                }
+                rates.push({
+                    value: i,
+                    label: `1/${Math.pow(2, i)} (${loggingFrequency}${loggingFrequencyUnit})`,
+                });
+            }
+            return rates;
+        });
+
+        const debugModes = computed(() => {
+            const modes = [];
+            const debugModeCount = fcStore.pidAdvancedConfig?.debugModeCount || 0;
+            for (let i = 0; i < debugModeCount; i++) {
+                const label =
+                    i < debugStore.modes.length
+                        ? debugStore.modes[i]
+                        : i18n.getMessage("onboardLoggingDebugModeUnknown");
+                modes.push({ label, value: i });
+            }
+            modes.sort((a, b) => a.label.localeCompare(b.label));
+            return modes;
+        });
+
+        const showDebugFields = computed(() => {
+            return fcStore.config?.apiVersion && semver.gte(fcStore.config.apiVersion, API_VERSION_1_45);
+        });
+
+        const debugFields = computed(() => debugStore.enableFields);
+
+        const dataflashUsedSize = computed(() => fcStore.dataflash?.usedSize || 0);
+        const dataflashTotalSize = computed(() => fcStore.dataflash?.totalSize || 0);
+        const dataflashFreeSize = computed(() => dataflashTotalSize.value - dataflashUsedSize.value);
+        const dataflashUsedPercent = computed(() => {
+            if (dataflashTotalSize.value === 0) {
+                return 0;
+            }
+            return (dataflashUsedSize.value / dataflashTotalSize.value) * 100;
+        });
+        const dataflashFreePercent = computed(() => {
+            if (dataflashTotalSize.value === 0) {
+                return 0;
+            }
+            return (dataflashFreeSize.value / dataflashTotalSize.value) * 100;
+        });
+
+        const sdcardTotalKB = computed(() => fcStore.sdcard?.totalSizeKB || 0);
+        const sdcardFreeKB = computed(() => fcStore.sdcard?.freeSizeKB || 0);
+        const sdcardUsedKB = computed(() => sdcardTotalKB.value - sdcardFreeKB.value);
+        const sdcardUsedPercent = computed(() => {
+            if (sdcardTotalKB.value === 0) {
+                return 0;
+            }
+            return (sdcardUsedKB.value / sdcardTotalKB.value) * 100;
+        });
+        const sdcardFreePercent = computed(() => {
+            if (sdcardTotalKB.value === 0) {
+                return 0;
+            }
+            return (sdcardFreeKB.value / sdcardTotalKB.value) * 100;
+        });
+
+        const sdcardState = computed(() => fcStore.sdcard?.state);
+
+        const sdcardStatusText = computed(() => {
+            switch (sdcardState.value) {
+                case MSP.SDCARD_STATE_NOT_PRESENT:
+                    return i18n.getMessage("sdcardStatusNoCard");
+                case MSP.SDCARD_STATE_FATAL:
+                    return i18n.getMessage("sdcardStatusReboot");
+                case MSP.SDCARD_STATE_READY:
+                    return i18n.getMessage("sdcardStatusReady");
+                case MSP.SDCARD_STATE_CARD_INIT:
+                    return i18n.getMessage("sdcardStatusStarting");
+                case MSP.SDCARD_STATE_FS_INIT:
+                    return i18n.getMessage("sdcardStatusFileSystem");
+                default:
+                    return i18n.getMessage("sdcardStatusUnknown", [sdcardState.value]);
+            }
+        });
+
+        const mscReady = computed(() => {
+            return dataflashPresent.value || sdcardState.value === MSP.SDCARD_STATE_READY;
+        });
+
+        const mscSupported = computed(() => {
+            return (
+                (sdcardSupported.value && blackboxDevice.value == 2) ||
+                (dataflashSupported.value && blackboxDevice.value == 1)
+            );
+        });
+
+        /** Baseline after MSP load or successful save; same pattern as Power / Auxiliary */
+        const onboardLoggingBaseline = ref("");
+
+        const serializeOnboardLoggingState = () =>
+            JSON.stringify({
+                blackboxDevice: blackboxDevice.value,
+                blackboxRate: blackboxRate.value,
+                debugMode: debugMode.value,
+                debugFieldsEnabled: [...debugFieldsEnabled.value],
+            });
+
+        const dirty = computed(() => {
+            if (!onboardLoggingBaseline.value) {
+                return false;
+            }
+            return onboardLoggingBaseline.value !== serializeOnboardLoggingState();
+        });
+
+        function updateDebugField(index, value) {
+            // Use splice to ensure Vue 3 reactivity
+            debugFieldsEnabled.value.splice(index, 1, value);
+        }
+
+        async function saveSettings() {
+            if (!fcStore.blackbox?.supported) {
+                return;
+            }
+
+            fcStore.blackbox.blackboxSampleRate = blackboxRate.value;
+            fcStore.blackbox.blackboxPDenom = blackboxRate.value;
+            fcStore.blackbox.blackboxDevice = blackboxDevice.value;
+
+            // Update disabled mask from checkboxes
+            let mask = 0;
+            debugFieldsEnabled.value.forEach((enabled, index) => {
+                if (!enabled) {
+                    mask |= 1 << index;
+                }
+            });
+            fcStore.blackbox.blackboxDisabledMask = mask;
+
+            await MSP.promise(MSPCodes.MSP_SET_BLACKBOX_CONFIG, mspHelper.crunch(MSPCodes.MSP_SET_BLACKBOX_CONFIG));
+
+            fcStore.pidAdvancedConfig.debugMode = debugMode.value;
+            await MSP.promise(MSPCodes.MSP_SET_ADVANCED_CONFIG, mspHelper.crunch(MSPCodes.MSP_SET_ADVANCED_CONFIG));
+
+            mspHelper.writeConfiguration(true);
+            onboardLoggingBaseline.value = serializeOnboardLoggingState();
+        }
+
+        function askToEraseFlash() {
+            if (dataflashUsedSize.value === 0) {
+                return;
+            }
+            eraseCancelled.value = false;
+            eraseDialog.value?.showModal();
+        }
+
+        function flashErase() {
+            connectionStore.pauseLiveData();
+            connectionStore.clearMspQueue();
+            isErasing.value = true;
+            MSP.send_message(MSPCodes.MSP_DATAFLASH_ERASE, false, false, pollForEraseCompletion);
+        }
+
+        function flashEraseCancel() {
+            eraseCancelled.value = true;
+            isErasing.value = false;
+            eraseDialog.value?.close();
+            connectionStore.resumeLiveData();
+        }
+
+        function pollForEraseCompletion() {
+            flashUpdateSummary(() => {
+                if (connectionStore.connectionValid && !eraseCancelled.value) {
+                    if (fcStore.dataflash?.ready) {
+                        isErasing.value = false;
+                        eraseDialog.value?.close();
+                        connectionStore.resumeLiveData();
+                        if (getConfig("showNotifications").showNotifications) {
+                            NotificationManager.showNotification("Betaflight App", {
+                                body: i18n.getMessage("flashEraseDoneNotification"),
+                                icon: "/images/pwa/favicon.ico",
+                            });
+                        }
+                    } else {
+                        setTimeout(pollForEraseCompletion, 500);
+                    }
+                }
+            });
+        }
+
+        function flashUpdateSummary(onDone) {
+            MSP.send_message(MSPCodes.MSP_DATAFLASH_SUMMARY, false, false, () => {
+                if (onDone) {
+                    onDone();
+                }
+            });
+        }
+
+        function showSavingDialog() {
+            saveProgress.value = 0;
+            saveCancelled.value = false;
+            savingDialog.value?.showModal();
+            nextTick(() => {
+                savingDialog.value?.classList.remove("done");
+            });
+        }
+
+        function dismissSavingDialog() {
+            savingDialog.value?.close();
+        }
+
+        function markSavingDialogDone(startTime, totalBytes, totalBytesCompressed) {
+            const totalTime = (Date.now() - startTime) / 1000;
+            console.log(
+                `Received ${totalBytes} bytes in ${totalTime.toFixed(2)}s (${(totalBytes / totalTime / 1024).toFixed(
+                    2,
+                )}kB / s) with block size ${blockSize.value}.`,
+            );
+            if (!Number.isNaN(totalBytesCompressed)) {
+                console.log(
+                    "Compressed into",
+                    totalBytesCompressed,
+                    "bytes with mean compression factor of",
+                    totalBytes / totalBytesCompressed,
+                );
+            }
+
+            nextTick(() => {
+                savingDialog.value?.classList.add("done");
+            });
+
+            if (getConfig("showNotifications").showNotifications) {
+                NotificationManager.showNotification("Betaflight App", {
+                    body: i18n.getMessage("flashDownloadDoneNotification"),
+                    icon: "/images/pwa/favicon.ico",
+                });
+            }
+        }
+
+        function flashSaveCancel() {
+            saveCancelled.value = true;
+        }
+
+        function conditionallyEraseFlash(maxBytes, nextAddress) {
+            if (Number.isFinite(maxBytes) && nextAddress >= maxBytes) {
+                eraseCancelled.value = false;
+                nextTick(() => {
+                    eraseDialog.value?.classList.add("erasing");
+                });
+                eraseDialog.value?.showModal();
+                MSP.send_message(MSPCodes.MSP_DATAFLASH_ERASE, false, false, pollForEraseCompletion);
+            } else {
+                gui_log(
+                    i18n.getMessage("dataflashSaveIncompleteWarning") ||
+                        "Downloaded size did not match expected size - not erasing flash.",
+                );
+            }
+        }
+
+        async function flashSaveBegin(alsoErase = false) {
+            if (!GUI.connected_to || dataflashUsedSize.value === 0) {
+                return;
+            }
+
+            blockSize.value = BLOCK_SIZE;
+
+            // Refresh the occupied size
+            flashUpdateSummary(async () => {
+                const maxBytes = fcStore.dataflash?.usedSize || 0;
+                let openedFile;
+
+                try {
+                    const prefix = "BLACKBOX_LOG";
+                    const suffix = "BBL";
+                    const filename = generateFilename(prefix, suffix);
+
+                    const fileWriter = await FileSystem.pickSaveFile(
+                        filename,
+                        i18n.getMessage("fileSystemPickerFiles", { typeof: suffix }),
+                        `.${suffix}`,
+                    );
+
+                    let nextAddress = 0;
+                    let totalBytesCompressed = 0;
+
+                    showSavingDialog();
+
+                    function onChunkRead(chunkAddress, chunkDataView, bytesCompressed) {
+                        if (chunkDataView !== null) {
+                            if (chunkDataView.byteLength > 0) {
+                                nextAddress += chunkDataView.byteLength;
+                                if (Number.isNaN(bytesCompressed) || Number.isNaN(totalBytesCompressed)) {
+                                    totalBytesCompressed = null;
+                                } else {
+                                    totalBytesCompressed += bytesCompressed;
+                                }
+
+                                saveProgress.value = (nextAddress / maxBytes) * 100;
+
+                                const blob = new Blob([chunkDataView]);
+                                FileSystem.writeChunck(openedFile, blob).then(() => {
+                                    if (saveCancelled.value || nextAddress >= maxBytes) {
+                                        if (saveCancelled.value) {
+                                            dismissSavingDialog();
+                                        } else {
+                                            markSavingDialogDone(startTime, nextAddress, totalBytesCompressed);
+                                        }
+                                        FileSystem.closeFile(openedFile);
+                                        if (!saveCancelled.value && alsoErase) {
+                                            conditionallyEraseFlash(maxBytes, nextAddress);
+                                        }
+                                        return;
+                                    }
+
+                                    if (writeError.value) {
+                                        dismissSavingDialog();
+                                        FileSystem.closeFile(openedFile);
+                                    } else {
+                                        mspHelper.dataflashRead(nextAddress, blockSize.value, onChunkRead);
+                                    }
+                                });
+                            } else {
+                                // Zero-byte block = end of file
+                                markSavingDialogDone(startTime, nextAddress, totalBytesCompressed);
+                                FileSystem.closeFile(openedFile);
+                                if (!saveCancelled.value && alsoErase) {
+                                    conditionallyEraseFlash(maxBytes, nextAddress);
+                                }
+                            }
+                        } else {
+                            // Error - retry
+                            mspHelper.dataflashRead(nextAddress, blockSize.value, onChunkRead);
+                        }
+                    }
+
+                    const startTime = Date.now();
+                    openedFile = await FileSystem.openFile(fileWriter);
+                    mspHelper.dataflashRead(nextAddress, blockSize.value, onChunkRead);
+                } catch (error) {
+                    console.error("Error saving blackbox file:", error);
+                    gui_log(i18n.getMessage("dataflashFileWriteFailed"));
+                    gui_log(
+                        `<strong><span class="message-negative">${i18n.getMessage("error", {
+                            errorMessage: error,
+                        })}</span></strong>`,
+                    );
+                }
+            });
+        }
+
+        function rebootToMsc() {
+            if (!mscReady.value) {
+                return;
+            }
+
+            const buffer = [];
+            if (GUI.operating_system === "Linux") {
+                buffer.push(mspHelper.REBOOT_TYPES.MSC_UTC);
+            } else {
+                buffer.push(mspHelper.REBOOT_TYPES.MSC);
+            }
+            MSP.send_message(MSPCodes.MSP_SET_REBOOT, buffer, false);
+        }
+
+        function updateHtml() {
+            if (sdcardSupported.value && !sdcardTimer) {
+                sdcardTimer = setTimeout(() => {
+                    sdcardTimer = null;
+                    if (connectionStore.connectionValid) {
+                        MSP.send_message(MSPCodes.MSP_SDCARD_SUMMARY, false, false, updateHtml);
+                    }
+                }, 2000);
+            }
+
+            // Track logging status
+            let loggingStatus;
+            if (dataflashPresent.value && sdcardState.value === MSP.SDCARD_STATE_NOT_PRESENT) {
+                loggingStatus = "Dataflash";
+            } else {
+                switch (sdcardState.value) {
+                    case MSP.SDCARD_STATE_NOT_PRESENT:
+                        loggingStatus = "SdCard: NotPresent";
+                        break;
+                    case MSP.SDCARD_STATE_FATAL:
+                        loggingStatus = "SdCard: Error";
+                        break;
+                    case MSP.SDCARD_STATE_READY:
+                        loggingStatus = "SdCard: Ready";
+                        break;
+                    case MSP.SDCARD_STATE_CARD_INIT:
+                        loggingStatus = "SdCard: Init";
+                        break;
+                    case MSP.SDCARD_STATE_FS_INIT:
+                        loggingStatus = "SdCard: FsInit";
+                        break;
+                    default:
+                        loggingStatus = "SdCard: Unknown";
+                }
+            }
+
+            if (typeof tracking !== "undefined") {
+                tracking.sendEvent(tracking.EVENT_CATEGORIES.FLIGHT_CONTROLLER, "DataLogging", {
+                    logSize: fcStore.dataflash?.usedSize || 0,
+                    logStatus: loggingStatus,
+                });
+            }
+        }
+
+        async function loadData() {
+            try {
+                await MSP.promise(MSPCodes.MSP_FEATURE_CONFIG);
+                await MSP.promise(MSPCodes.MSP_DATAFLASH_SUMMARY);
+                await MSP.promise(MSPCodes.MSP_SDCARD_SUMMARY);
+                await MSP.promise(MSPCodes.MSP_BLACKBOX_CONFIG);
+                await MSP.promise(MSPCodes.MSP_ADVANCED_CONFIG);
+                await MSP.promise(MSPCodes.MSP_SENSOR_CONFIG);
+
+                if (fcStore.config?.apiVersion && semver.gte(fcStore.config.apiVersion, API_VERSION_1_45)) {
+                    await MSP.promise(
+                        MSPCodes.MSP2_GET_TEXT,
+                        mspHelper.crunch(MSPCodes.MSP2_GET_TEXT, MSPCodes.CRAFT_NAME),
+                    );
+                } else {
+                    await MSP.promise(MSPCodes.MSP_NAME);
+                }
+
+                if (fcStore.config?.apiVersion && semver.gte(fcStore.config.apiVersion, API_VERSION_1_47)) {
+                    await MSP.promise(MSPCodes.MSP2_SENSOR_CONFIG_ACTIVE);
+                }
+
+                // Populate UI state
+                blackboxDevice.value = fcStore.blackbox?.blackboxDevice || 0;
+                blackboxRate.value = fcStore.blackbox?.blackboxSampleRate || 0;
+                debugMode.value = fcStore.pidAdvancedConfig?.debugMode || 0;
+
+                // Initialize debug fields checkboxes
+                if (showDebugFields.value) {
+                    const disabledMask = fcStore.blackbox?.blackboxDisabledMask || 0;
+                    debugFieldsEnabled.value = debugStore.enableFields.map((_, index) => {
+                        return (disabledMask & (1 << index)) === 0;
+                    });
+                }
+
+                updateVirtualGyro();
+                onboardLoggingBaseline.value = serializeOnboardLoggingState();
+                updateHtml();
+            } catch (error) {
+                console.error("Failed to load onboard logging data", error);
+            } finally {
+                GUI.content_ready();
+            }
+        }
+
+        onMounted(() => {
+            loadData();
+        });
+
+        onUnmounted(() => {
+            if (sdcardTimer) {
+                clearTimeout(sdcardTimer);
+                sdcardTimer = null;
+            }
+        });
+
+        return {
+            MSP,
+            eraseDialog,
+            savingDialog,
+            blackboxDevice,
+            blackboxRate,
+            debugMode,
+            debugFieldsEnabled,
+            saveProgress,
+            isErasing,
+            dataflashSupported,
+            dataflashPresent,
+            sdcardSupported,
+            blackboxConfigSupported,
+            isExpertMode,
+            virtualGyro,
+            blackboxDeviceOptions,
+            blackboxSupport,
+            loggingRates,
+            debugModes,
+            showDebugFields,
+            debugFields,
+            dataflashUsedSize,
+            dataflashUsedPercent,
+            dataflashFreeSize,
+            dataflashFreePercent,
+            sdcardUsedKB,
+            sdcardUsedPercent,
+            sdcardFreeKB,
+            sdcardFreePercent,
+            sdcardStatusText,
+            sdcardState,
+            mscReady,
+            mscSupported,
+            formatBytes,
+            formatKilobytes,
+            updateDebugField,
+            saveSettings,
+            dirty,
+            askToEraseFlash,
+            flashErase,
+            flashEraseCancel,
+            flashSaveBegin,
+            flashSaveCancel,
+            dismissSavingDialog,
+            rebootToMsc,
+        };
+    },
+});
+</script>
+
+<style lang="less">
+.tab-onboard_logging {
+    .blackboxDebugFieldsTable {
+        .debug-field-row {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    }
+
+    .info {
+        margin: 0 0 10px 0;
+        position: relative;
+        margin-top: 10px;
+        .progressLabel {
+            position: absolute;
+            width: 100%;
+            height: 26px;
+            top: 0;
+            left: 0;
+            text-align: center;
+            line-height: 24px;
+            color: white;
+            font-weight: bold;
+        }
+        dt {
+            width: 120px;
+            height: 20px;
+            line-height: 20px;
+            font-weight: bold;
+        }
+        dd {
+            display: block;
+            margin-left: 130px;
+            height: 20px;
+            line-height: 20px;
+        }
+    }
+    .properties {
+        margin-top: 10px;
+    }
+    .dataflash-info {
+        overflow: hidden;
+        dt {
+            width: 12em;
+            height: 20px;
+            line-height: 20px;
+            font-weight: bold;
+        }
+        dd {
+            display: block;
+            height: 20px;
+            line-height: 20px;
+        }
+    }
+    .speed {
+        margin-top: 5px;
+        width: 80px;
+        border: 1px solid var(--surface-500);
+    }
+    .buttons {
+        width: calc(100% - 20px);
+        position: absolute;
+        bottom: 10px;
+    }
+    .dataflash-progress {
+        display: none;
+    }
+    .dataflash-contents {
+        margin-top: 15px;
+        margin-bottom: 26px;
+        border: 1px solid var(--surface-500);
+        background-color: var(--surface-300);
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        border-radius: 6px;
+        li {
+            height: 26px;
+            position: relative;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            div {
+                position: absolute;
+                top: 26px;
+                margin-top: 4px;
+                text-align: center;
+                left: 0;
+                right: 0;
+                white-space: nowrap;
+            }
+        }
+    }
+    .sdcard-contents {
+        margin-top: 15px;
+        margin-bottom: 26px;
+        border: 1px solid var(--surface-500);
+        background-color: var(--surface-300);
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        border-radius: 6px;
+        li {
+            height: 26px;
+            position: relative;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            div {
+                position: absolute;
+                top: 26px;
+                margin-top: 4px;
+                text-align: center;
+                left: 0;
+                right: 0;
+                white-space: nowrap;
+            }
+        }
+    }
+    .dataflash-used {
+        background-color: var(--primary-500);
+        border-radius: 4px;
+    }
+    .sdcard-other {
+        background-color: var(--primary-500);
+        border-radius: 4px;
+    }
+    .dataflash-free {
+        direction: rtl;
+    }
+    .sdcard-free {
+        direction: rtl;
+    }
+    progress {
+        &::-webkit-progress-bar {
+            background-color: var(--surface-500);
+        }
+        &::-webkit-progress-value {
+            background-color: var(--primary-500);
+            border-radius: 0 4px 4px 0;
+        }
+        border-radius: 4px;
+        overflow: hidden;
+        height: 24px;
+        display: block;
+        width: 100%;
+        margin: 1em 0;
+    }
+    dialog {
+        width: 40em;
+        border-radius: 5px;
+        .buttons {
+            position: static;
+            margin-top: 2em;
+        }
+        h3 {
+            margin-bottom: 0.5em;
+        }
+    }
+    .require-msc-supported {
+        display: none;
+    }
+    .require-msc-not-supported {
+        display: inherit;
+    }
+    .line {
+        clear: left;
+    }
+    .blackboxDebugModeText {
+        margin-left: 7px !important;
+    }
+    .sdcard-status {
+        padding-top: 4px;
+        text-align: center;
+    }
+    .sdcard-icon {
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        width: 90px;
+        height: 90px;
+        background-image: url(../../images/icons/cf_icon_sdcard.svg);
+        background-position: 21px 20px;
+        background-size: 50px 50px;
+        background-repeat: no-repeat;
+        background-color: #808080;
+        border: 1px solid #888888;
+        border-radius: 45px;
+    }
+}
+.dataflash-confirm-erase {
+    .dataflash-erase-progress {
+        height: 125px;
+        display: none;
+        border-radius: 5px;
+    }
+}
+.dataflash-buttons {
+    display: inline-block;
+}
+.dataflash-confirm-erase.erasing {
+    .dataflash-erase-progress {
+        display: block;
+    }
+    h3 {
+        display: none;
+    }
+    .erase-flash-confirm {
+        display: none;
+    }
+    .dataflash-confirm-erase-note {
+        display: none;
+    }
+}
+.dataflash-saving {
+    .dataflash-saving-after {
+        display: none;
+    }
+}
+.dataflash-saving.done {
+    .dataflash-saving-before {
+        display: none;
+    }
+    .dataflash-saving-after {
+        display: block;
+    }
+}
+.require-dataflash-present {
+    display: none;
+}
+.require-dataflash-supported {
+    display: none;
+}
+.require-sdcard-ready {
+    display: none;
+}
+.require-sdcard-supported {
+    display: none;
+}
+.require-blackbox-supported {
+    display: none;
+}
+.require-blackbox-maybe-supported {
+    display: none;
+}
+.require-blackbox-unsupported {
+    display: none;
+}
+.require-blackbox-config-supported {
+    display: none;
+}
+.tab-onboard_logging.dataflash-present {
+    .require-dataflash-not-present {
+        display: none;
+    }
+    .require-dataflash-present {
+        display: block;
+    }
+}
+.tab-onboard_logging.dataflash-supported {
+    .require-dataflash-unsupported {
+        display: none;
+    }
+    .require-dataflash-supported {
+        display: block;
+    }
+}
+.tab-onboard_logging.sdcard-supported {
+    .require-sdcard-unsupported {
+        display: none;
+    }
+    .require-sdcard-supported {
+        display: block;
+    }
+}
+.tab-onboard_logging.blackbox-config-supported {
+    .require-blackbox-config-unsupported {
+        display: none;
+    }
+    .require-blackbox-config-supported {
+        display: block;
+    }
+}
+.tab-onboard_logging.sdcard-ready {
+    .require-sdcard-ready {
+        display: block;
+    }
+    .sdcard-icon {
+        background-color: #56ac1d;
+        border: 1px solid #5bbb1b;
+    }
+}
+.tab-onboard_logging.blackbox-supported {
+    .require-blackbox-supported {
+        display: inherit;
+    }
+}
+.tab-onboard_logging.blackbox-maybe-supported {
+    .require-blackbox-maybe-supported {
+        display: block;
+    }
+}
+.tab-onboard_logging.blackbox-unsupported {
+    .require-blackbox-unsupported {
+        display: block;
+    }
+}
+.require-no-dataflash {
+    display: block;
+}
+.tab-onboard_logging.supported {
+    .require-no-dataflash {
+        display: none;
+    }
+}
+.tab-onboard_logging.msc-supported {
+    .require-msc-supported {
+        display: inherit;
+    }
+    .require-msc-not-supported {
+        display: none;
+    }
+}
+.require-msc-not-ready {
+    display: none;
+}
+.tab-onboard_logging.msc-not-ready {
+    .require-msc-not-ready {
+        display: block;
+    }
+}
+.tab-onboard_logging.sdcard-error {
+    .sdcard-icon {
+        background-color: #e60000;
+        border: 1px solid #fe0000;
+    }
+}
+.tab-onboard_logging.sdcard-initializing {
+    .sdcard-icon {
+        background-color: #64a5f6;
+        border: 1px solid #68a7ff;
+    }
+}
+</style>
