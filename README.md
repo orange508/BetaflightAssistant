@@ -2,7 +2,7 @@
 ![Betaflight](https://raw.githubusercontent.com/betaflight/.github/main/profile/images/bf_logo_dark.svg#gh-dark-mode-only)
 
 # ✨BetaflightAssistant✨
-
+# 持续更新中……(当前知识库并不完整，请理性分析，谨慎使用)
 > 让穿越机调参像聊天一样简单
 > 🚨 **安全警告**：AI 建议仅供参考，调参后务必低空悬停测试，确认安全再飞。放生风险自负。
 
