@@ -90,7 +90,7 @@ AI 会：
 ## 📦 下载
 
 ### 国内镜像（高速）
-👉 [https://btai.cpolar.top](https://btai.cpolar.top)
+👉 [https://btai.cpolar.top](~~~https://btai.cpolar.top~~~)
 
 ### GitHub Releases
 👉 [https://github.com/orange508/BetaflightAssistant/releases](https://github.com/orange508/BetaflightAssistant/releases)
