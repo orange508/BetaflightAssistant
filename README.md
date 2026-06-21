@@ -89,8 +89,8 @@ AI 会：
 
 ## 📦 下载
 
-### 国内镜像（高速）暂时不可用原因:服务器炸了
-👉 ~~https://btai.cpolar.top~~
+### 国内镜像（高速下载）
+👉 https://btai.cpolar.top
 
 ### GitHub Releases
 👉 [https://github.com/orange508/BetaflightAssistant/releases](https://github.com/orange508/BetaflightAssistant/releases)
