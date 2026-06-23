@@ -65,7 +65,7 @@ AI 会：
 | DeepSeek | 推荐，便宜，响应快 |
 | OpenAI | GPT-4 / GPT-3.5 |
 | 火山引擎 | 豆包大模型 |
-| Ollama | 本地任意开源模型，免费 |
+| Ollama | 本地开源模型，需要GPU |
 
 > 只要支持 OpenAI 格式 API，都能直接用。
 
@@ -97,14 +97,14 @@ AI 会：
 
 | 系统 | 包 |
 |------|-----|
-| 🐧 Ubuntu/Debian | `.deb` |
-| 🐧 通用 Linux | `.AppImage` |
-| 🐧 Fedora/RHEL | `.rpm` |
-| 🪟 Windows 11/10 | `.exe` 安装包 |
+| Ubuntu/Debian | `.deb` |
+| 通用 Linux | `.AppImage` |
+| Fedora/RHEL | `.rpm` |
+| Windows 11/10 | `.exe` 安装包 |
 
 ---
 
-## 🛠️ 技术栈
+## 技术栈
 
 - **前端**：Vue 3 + Vite
 - **桌面打包**：Tauri (Rust)
@@ -113,7 +113,7 @@ AI 会：
 
 ---
 
-## ❓ 常见问题
+## 常见问题
 
 **Q: 没有 API Key 能用吗？**  
 > 可以，用 Ollama 跑本地模型，免费。
