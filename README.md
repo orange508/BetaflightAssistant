@@ -89,14 +89,11 @@ AI 会：
 
 ## 📦 下载
 
-### 国内镜像（高速下载）
-👉 https://btai.cpolar.top
- 
-### 我的博客
-👉 https://ps.cpolar.top/
+### 网站跳转
+👉 https://ps.cpolar.top/post/16
 
 ### GitHub Releases
-👉 [https://github.com/orange508/BetaflightAssistant/releases](https://github.com/orange508/BetaflightAssistant/releases)
+👉[https://github.com/orange508/BetaflightAssistant/releases](https://github.com/orange508/BetaflightAssistant/releases)
 
 | 系统 | 包 |
 |------|-----|
